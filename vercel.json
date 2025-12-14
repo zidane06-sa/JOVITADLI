@@ -1,5 +1,5 @@
 {
-  "installCommand": "npm install && npm install --prefix backend && npm install --prefix vite-frontend-framework",
+  "installCommand": "npm run install-all",
   "buildCommand": "npm run build --prefix vite-frontend-framework",
   "outputDirectory": "vite-frontend-framework/.next",
   "routes": [
