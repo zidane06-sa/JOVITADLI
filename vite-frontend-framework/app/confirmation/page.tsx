@@ -19,10 +19,10 @@ export default function ConfirmationPage() {
   // Center servos when this page mounts
   useEffect(() => {
     // Use the correct API URL based on current protocol
-    fetch(`${getApiUrl()}/api/servo/center`, { method: 'GET' })
+    fetch(`${getApiUrl()}/api/servo/center`, { method: 'POST' })
       .then((res) => res.json().catch(() => null))
       .then((data) => {
-        console.log('Servo center response:', data)
+        console.log('Servo center request sent:', data)
       })
       .catch((err) => {
         console.warn('Failed to send center command', err)

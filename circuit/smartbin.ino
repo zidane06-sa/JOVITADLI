@@ -239,6 +239,16 @@ void pollBackendForCommand() {
       String payload = https.getString();
       Serial.println("Backend response: " + payload);
 
+      // Check if shouldCenter flag is true
+      if (payload.indexOf("\"shouldCenter\":true") >= 0) {
+        Serial.println("Center command received from backend!");
+        servoX.write(90);
+        servoZ.write(90);
+        delay(300);
+        https.end();
+        return;
+      }
+
       // Parse response untuk check hasPendingCommand dan command.bin
       if (payload.indexOf("\"hasPendingCommand\":true") >= 0) {
         Serial.println("Pending command detected!");

@@ -85,8 +85,16 @@ exports.ackCommand = async (req, res) => {
 // Frontend POST sini untuk request servo center, ESP32 poll sini untuk ambil request
 exports.centerServo = async (req, res) => {
   try {
-    // Jika GET (ESP32 polling), check apakah ada center request pending
-    if (req.method === 'GET') {
+    // Jika POST dari frontend, store center request
+    if (req.method === 'POST') {
+      lastCenterRequest = { timestamp: Date.now() };
+      console.log('📤 Center command stored for ESP32');
+      res.json({
+        success: true,
+        message: 'Center command stored, waiting for ESP32',
+      });
+    } else if (req.method === 'GET') {
+      // GET dari ESP32 untuk check apakah ada center request pending
       if (lastCenterRequest && (Date.now() - lastCenterRequest.timestamp) < 30000) {
         // Ada center request dalam 30 detik terakhir
         lastCenterRequest = null;
@@ -102,14 +110,6 @@ exports.centerServo = async (req, res) => {
           shouldCenter: false,
         });
       }
-    } else {
-      // POST dari frontend, store untuk ESP32
-      lastCenterRequest = { timestamp: Date.now() };
-      console.log('📤 Center command stored for ESP32');
-      res.json({
-        success: true,
-        message: 'Center command stored, waiting for ESP32',
-      });
     }
   } catch (error) {
     console.error('Error in centerServo:', error);
@@ -122,9 +122,22 @@ exports.centerServo = async (req, res) => {
 };
 
 // Controller untuk GET /api/servo/status
-// ESP32 poll sini untuk check apakah ada pending command
+// ESP32 poll sini untuk check apakah ada pending command atau center request
 exports.checkESP32Status = async (req, res) => {
   try {
+    // Check center request first (priority)
+    if (lastCenterRequest && (Date.now() - lastCenterRequest.timestamp) < 30000) {
+      console.log('✅ Sending center request to ESP32');
+      lastCenterRequest = null;
+      res.json({
+        success: true,
+        message: 'Center request pending',
+        shouldCenter: true,
+        hasPendingCommand: false,
+      });
+      return;
+    }
+
     // Jika ada pending command, kirim ke ESP32
     if (pendingServoCommand) {
       const command = pendingServoCommand;
@@ -136,6 +149,7 @@ exports.checkESP32Status = async (req, res) => {
         message: 'Pending command available',
         command: command,
         hasPendingCommand: true,
+        shouldCenter: false,
       });
     } else {
       // Tidak ada command pending
@@ -143,6 +157,7 @@ exports.checkESP32Status = async (req, res) => {
         success: true,
         message: 'ESP32 is connected',
         hasPendingCommand: false,
+        shouldCenter: false,
       });
     }
   } catch (error) {
