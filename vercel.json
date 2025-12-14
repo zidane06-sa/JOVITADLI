@@ -1,6 +1,13 @@
 {
-  "buildCommand": "cd backend && npm install && cd ../vite-frontend-framework && npm install && npm run build",
+  "buildCommand": "npm run build",
   "outputDirectory": "vite-frontend-framework/.next",
+  "installCommand": "npm install && cd backend && npm install && cd ../vite-frontend-framework && npm install",
+  "functions": {
+    "api/index.js": {
+      "maxDuration": 30,
+      "memory": 1024
+    }
+  },
   "rewrites": [
     {
       "source": "/api/:path*",
