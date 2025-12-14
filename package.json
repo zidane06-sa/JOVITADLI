@@ -1,11 +1,9 @@
 {
   "name": "jovita-project",
   "version": "1.0.0",
-  "description": "Smart Waste Bin with IoT Integration",
+  "private": true,
   "scripts": {
-    "install-all": "npm install && npm --prefix backend install && npm --prefix vite-frontend-framework install",
+    "install-all": "cd backend && npm install && cd ../vite-frontend-framework && npm install",
     "build": "cd vite-frontend-framework && npm run build"
-  },
-  "dependencies": {},
-  "devDependencies": {}
+  }
 }
