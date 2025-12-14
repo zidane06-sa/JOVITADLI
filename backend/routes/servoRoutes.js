@@ -10,8 +10,9 @@ router.post('/move', moveServo);
 
 // GET endpoint untuk check status ESP32
 router.get('/status', checkESP32Status);
-// GET endpoint untuk center servos
+// GET & POST endpoint untuk center servos
 router.get('/center', centerServo);
+router.post('/center', centerServo);
 // GET endpoint untuk query IR status
 router.get('/ir-status', getIRStatus);
 // POST endpoint untuk item counted (triggered by ESP32)
