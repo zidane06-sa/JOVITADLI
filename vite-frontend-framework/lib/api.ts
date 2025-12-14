@@ -10,7 +10,11 @@ export async function triggerServo(binType: string): Promise<any> {
   try {
     console.log(`📤 Triggering servo for bin type: ${binType}`);
 
-    const targetBase = USE_ESP32 ? ESP32_BASE_URL : API_BASE_URL;
+    // Prevent mixed-content errors: if page is loaded over HTTPS, always use backend (HTTPS).
+    let targetBase = USE_ESP32 ? ESP32_BASE_URL : API_BASE_URL;
+    if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
+      targetBase = API_BASE_URL;
+    }
 
     const response = await fetch(`${targetBase}/api/servo/move`, {
       method: 'POST',
