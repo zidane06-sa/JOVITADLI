@@ -49,8 +49,15 @@ try {
 
 // END DEBUGGING BLOCK
 
-app.listen(PORT, () => {
-  console.log(`Server berjalan di http://localhost:${PORT}`);
-  console.log(`Endpoint CRUD: http://localhost:${PORT}/api/nama`);
-  console.log(`Endpoint Transaksi: http://localhost:${PORT}/api/sampah/:jenis`);
-});
+// Export app for Vercel serverless
+module.exports = app;
+
+// Only listen locally (not on Vercel)
+if (process.env.NODE_ENV !== 'production') {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => {
+    console.log(`Server berjalan di http://localhost:${PORT}`);
+    console.log(`Endpoint CRUD: http://localhost:${PORT}/api/nama`);
+    console.log(`Endpoint Transaksi: http://localhost:${PORT}/api/sampah/:jenis`);
+  });
+}
