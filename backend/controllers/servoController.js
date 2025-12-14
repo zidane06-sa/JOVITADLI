@@ -2,12 +2,15 @@
 // Controller untuk mengontrol servo melalui polling mechanism
 // Backend menyimpan command, ESP32 poll untuk ambil command
 
-// Store pending servo commands
+// Store pending servo commands (in-memory, will reset on serverless cold start)
 let pendingServoCommand = null;
 let lastCenterRequest = null;
 
 // For logging/audit: last acknowledged commands
 let acknowledgedCommands = [];
+
+// Extend center request timeout to 60 seconds for more reliable polling
+const CENTER_REQUEST_TIMEOUT = 60000; // 60 seconds
 
 // Controller untuk POST /api/servo/move
 // Frontend POST ke sini, dan command disimpan untuk ESP32 poll
@@ -88,15 +91,17 @@ exports.centerServo = async (req, res) => {
     // Jika POST dari frontend, store center request
     if (req.method === 'POST') {
       lastCenterRequest = { timestamp: Date.now() };
-      console.log('📤 Center command stored for ESP32');
+      console.log('📤 Center command stored for ESP32 at:', new Date().toISOString());
       res.json({
         success: true,
         message: 'Center command stored, waiting for ESP32',
+        timestamp: lastCenterRequest.timestamp,
       });
     } else if (req.method === 'GET') {
       // GET dari ESP32 untuk check apakah ada center request pending
-      if (lastCenterRequest && (Date.now() - lastCenterRequest.timestamp) < 30000) {
-        // Ada center request dalam 30 detik terakhir
+      if (lastCenterRequest && (Date.now() - lastCenterRequest.timestamp) < CENTER_REQUEST_TIMEOUT) {
+        // Ada center request dalam timeout window
+        console.log('✅ Sending center request to ESP32');
         lastCenterRequest = null;
         res.json({
           success: true,
@@ -125,8 +130,10 @@ exports.centerServo = async (req, res) => {
 // ESP32 poll sini untuk check apakah ada pending command atau center request
 exports.checkESP32Status = async (req, res) => {
   try {
+    console.log('📊 ESP32 polling status at:', new Date().toISOString());
+    
     // Check center request first (priority)
-    if (lastCenterRequest && (Date.now() - lastCenterRequest.timestamp) < 30000) {
+    if (lastCenterRequest && (Date.now() - lastCenterRequest.timestamp) < CENTER_REQUEST_TIMEOUT) {
       console.log('✅ Sending center request to ESP32');
       lastCenterRequest = null;
       res.json({

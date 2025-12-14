@@ -213,7 +213,7 @@ void loop() {
 // Poll backend untuk check apakah ada pending servo command
 void pollBackendForCommand() {
   static unsigned long lastPoll = 0;
-  const unsigned long POLL_INTERVAL = 500; // Poll setiap 500ms
+  const unsigned long POLL_INTERVAL = 250; // Poll setiap 250ms (faster untuk center command)
 
   // Jangan poll terlalu sering
   if (millis() - lastPoll < POLL_INTERVAL) {
