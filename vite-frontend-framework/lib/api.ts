@@ -6,15 +6,19 @@ console.log('🔌 API Base URL:', API_BASE_URL);
 console.log('🤖 ESP32 Base URL:', ESP32_BASE_URL);
 console.log('⚙️ Use ESP32 directly:', USE_ESP32);
 
+// Helper function to get the correct API URL based on current protocol
+export function getApiUrl(): string {
+  if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
+    return API_BASE_URL; // Always use backend API when HTTPS (avoid mixed content)
+  }
+  return USE_ESP32 ? ESP32_BASE_URL : API_BASE_URL;
+}
+
 export async function triggerServo(binType: string): Promise<any> {
   try {
     console.log(`📤 Triggering servo for bin type: ${binType}`);
 
-    // Prevent mixed-content errors: if page is loaded over HTTPS, always use backend (HTTPS).
-    let targetBase = USE_ESP32 ? ESP32_BASE_URL : API_BASE_URL;
-    if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
-      targetBase = API_BASE_URL;
-    }
+    const targetBase = getApiUrl();
 
     const response = await fetch(`${targetBase}/api/servo/move`, {
       method: 'POST',

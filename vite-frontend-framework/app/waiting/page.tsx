@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
+import { getApiUrl } from "@/lib/api"
 
 export default function WaitingPage() {
   const router = useRouter()
@@ -30,7 +31,7 @@ export default function WaitingPage() {
     let pollCount = 0
     const pollItemCount = async () => {
       try {
-        const res = await fetch('http://localhost:5000/api/servo/item-status')
+        const res = await fetch(`${getApiUrl()}/api/servo/item-status`)
         if (!res.ok) throw new Error(`status ${res.status}`)
         const data = await res.json()
 

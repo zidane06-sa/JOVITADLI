@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Minus, Plus } from "lucide-react"
+import { getApiUrl } from "@/lib/api"
 
 export default function InputQuantityPage() {
   const router = useRouter()
@@ -14,7 +15,7 @@ export default function InputQuantityPage() {
       sessionStorage.setItem("targetQuantity", quantity.toString())
       
       // Reset backend item counter sebelum mulai transaksi baru
-      fetch('http://localhost:5000/api/servo/reset-item-count', { method: 'POST' })
+      fetch(`${getApiUrl()}/api/servo/reset-item-count`, { method: 'POST' })
         .then((res) => res.json())
         .then((data) => {
           console.log('Backend counter reset:', data)

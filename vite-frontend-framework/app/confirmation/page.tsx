@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation"
 import { useEffect } from "react"
 import { Button } from "@/components/ui/button"
+import { getApiUrl } from "@/lib/api"
 
 export default function ConfirmationPage() {
   const router = useRouter()
@@ -17,8 +18,8 @@ export default function ConfirmationPage() {
 
   // Center servos when this page mounts
   useEffect(() => {
-    // In dev the backend API runs on port 5000; call it directly
-    fetch('http://localhost:5000/api/servo/center', { method: 'GET' })
+    // Use the correct API URL based on current protocol
+    fetch(`${getApiUrl()}/api/servo/center`, { method: 'GET' })
       .then((res) => res.json().catch(() => null))
       .then((data) => {
         console.log('Servo center response:', data)

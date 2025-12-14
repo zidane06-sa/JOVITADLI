@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
+import { getApiUrl } from "@/lib/api"
 
 export default function SummaryPage() {
   const router = useRouter()
@@ -24,8 +25,9 @@ export default function SummaryPage() {
     // Send transaction to backend and update user points
     const username = sessionStorage.getItem("username") || "User"
     const total = Number.parseInt(sessionStorage.getItem("totalWaste") || "0")
+    const baseUrl = getApiUrl();
 
-    fetch("http://localhost:5000/api/nama/upsert", {
+    fetch(`${baseUrl}/api/nama/upsert`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username })
@@ -34,7 +36,7 @@ export default function SummaryPage() {
       .then((user) => {
         // Post per-jenis akumulasi; frontend stores selectedWaste earlier
         const jenis = sessionStorage.getItem("selectedWaste") || "plastik"
-        return fetch(`http://localhost:5000/api/sampah/${jenis}`, {
+        return fetch(`${baseUrl}/api/sampah/${jenis}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ user_id: user._id, jumlah_masuk: total })
