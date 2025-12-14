@@ -36,21 +36,34 @@ app.get('/', (req, res) => {
 
 // Baris 37: Kemungkinan besar salah satu dari ini bermasalah
 try {
+    console.log('Loading namaRoutes...');
     app.use('/api/nama', namaRoutes); // Cek apakah namaRoutes bermasalah
+    console.log('✅ namaRoutes loaded');
 } catch (e) {
-    console.error('ERROR DI NAMA ROUTES:', e.message);
+    console.error('❌ ERROR DI NAMA ROUTES:', e.message);
 }
 
 try {
+    console.log('Loading sampahRoutes...');
     app.use('/api/sampah', sampahRoutes); // Cek apakah sampahRoutes bermasalah
+    console.log('✅ sampahRoutes loaded');
 } catch (e) {
-    console.error('ERROR DI SAMPAH ROUTES:', e.message);
+    console.error('❌ ERROR DI SAMPAH ROUTES:', e.message);
 }
 
 try {
+    console.log('Loading servoRoutes...');
     app.use('/api/servo', servoRoutes); // Routes untuk kontrol servo
+    console.log('✅ servoRoutes loaded');
+    console.log('Registered methods for /api/servo:');
+    // Log all routes
+    app._router.stack.forEach(function(r){
+        if (r.route && r.route.path.includes('/servo')) {
+            console.log('  ', Object.keys(r.route.methods).map(m => m.toUpperCase()).join(','), r.route.path);
+        }
+    });
 } catch (e) {
-    console.error('ERROR DI SERVO ROUTES:', e.message);
+    console.error('❌ ERROR DI SERVO ROUTES:', e.message);
 }
 
 // END DEBUGGING BLOCK
