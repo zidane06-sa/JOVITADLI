@@ -1,12 +1,15 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+const ESP32_BASE_URL = process.env.NEXT_PUBLIC_ESP32_URL || 'http://10.185.232.169';
 
 console.log('🔌 API Base URL:', API_BASE_URL);
+console.log('🤖 ESP32 Base URL:', ESP32_BASE_URL);
 
 export async function triggerServo(binType: string): Promise<any> {
   try {
     console.log(`📤 Triggering servo for bin type: ${binType}`);
     
-    const response = await fetch(`${API_BASE_URL}/api/servo/move`, {
+    // Direct POST to ESP32 local network
+    const response = await fetch(`${ESP32_BASE_URL}/api/servo/move`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
