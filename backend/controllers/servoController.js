@@ -1,117 +1,13 @@
 // controllers/servoController.js
-// Controller untuk mengontrol servo melalui WiFi HTTP request ke ESP32
+// Controller untuk mengontrol servo melalui polling mechanism
+// Backend menyimpan command, ESP32 poll untuk ambil command
 
-// Konfigurasi ESP32 WiFi (ubah sesuai IP Address ESP32 Anda)
-const ESP32_IP = process.env.ESP32_IP || '10.65.76.169'; // Ubah ke IP ESP32 Anda
-const ESP32_PORT = 80;
-
-// Helper untuk query IR status dari ESP32
-async function getIRStatusFromESP32() {
-  try {
-    const http = require('http');
-
-    const options = {
-      hostname: ESP32_IP,
-      port: ESP32_PORT,
-      path: '/api/servo/ir-status',
-      method: 'GET',
-      timeout: 2000,
-    };
-
-    return new Promise((resolve, reject) => {
-      const req = http.request(options, (res) => {
-        let data = '';
-
-        res.on('data', (chunk) => {
-          data += chunk;
-        });
-
-        res.on('end', () => {
-          try {
-            const response = JSON.parse(data);
-            resolve(response);
-          } catch (e) {
-            resolve({ success: true, irDetected: false, raw: data });
-          }
-        });
-      });
-
-      req.on('error', (error) => {
-        reject(error);
-      });
-
-      req.on('timeout', () => {
-        req.destroy();
-        reject(new Error('Request timeout'));
-      });
-
-      req.end();
-    });
-  } catch (error) {
-    console.error('Error:', error);
-    throw error;
-  }
-}
-
-// Fungsi untuk mengirim request ke ESP32
-async function sendServoCommandToESP32(binType) {
-  try {
-    const http = require('http');
-
-    const postData = JSON.stringify({
-      bin: binType,
-    });
-
-    const options = {
-      hostname: ESP32_IP,
-      port: ESP32_PORT,
-      path: '/api/servo/move',
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(postData),
-      },
-      timeout: 5000,
-    };
-
-    return new Promise((resolve, reject) => {
-      const req = http.request(options, (res) => {
-        let data = '';
-
-        res.on('data', (chunk) => {
-          data += chunk;
-        });
-
-        res.on('end', () => {
-          try {
-            const response = JSON.parse(data);
-            resolve(response);
-          } catch (e) {
-            resolve({ success: true, message: 'Servo command sent', raw: data });
-          }
-        });
-      });
-
-      req.on('error', (error) => {
-        console.error('Error connecting to ESP32:', error);
-        reject(error);
-      });
-
-      req.on('timeout', () => {
-        req.destroy();
-        reject(new Error('Request timeout'));
-      });
-
-      req.write(postData);
-      req.end();
-    });
-  } catch (error) {
-    console.error('Error:', error);
-    throw error;
-  }
-}
+// Store pending servo commands
+let pendingServoCommand = null;
+let lastCenterRequest = null;
 
 // Controller untuk POST /api/servo/move
+// Frontend POST ke sini, dan command disimpan untuk ESP32 poll
 exports.moveServo = async (req, res) => {
   try {
     const { bin } = req.body;
@@ -132,158 +28,93 @@ exports.moveServo = async (req, res) => {
       });
     }
 
-    console.log(`📤 Sending servo command to ESP32 (${ESP32_IP}): ${bin}`);
-
-    // Kirim perintah ke ESP32
-    const espResponse = await sendServoCommandToESP32(bin);
+    console.log(`📤 Command stored for ESP32: ${bin}`);
+    
+    // Store command untuk ESP32 ambil via polling
+    pendingServoCommand = {
+      bin: bin,
+      timestamp: new Date(),
+    };
 
     res.json({
       success: true,
-      message: `Servo bergerak untuk ${bin}`,
+      message: `Servo command untuk ${bin} sudah tersimpan, menunggu ESP32 poll`,
       bin: bin,
-      espResponse: espResponse,
     });
   } catch (error) {
     console.error('Error in moveServo:', error);
-    res.status(503).json({
+    res.status(500).json({
       success: false,
-      message: 'Gagal menghubungi ESP32',
+      message: 'Server error',
       error: error.message,
-      hint: `Pastikan ESP32 tersambung ke WiFi dan IP address benar: ${ESP32_IP}`,
     });
   }
 };
 
-// Fungsi untuk mengirim request ke ESP32 agar mengembalikan servo ke center (90°)
-async function sendCenterCommandToESP32() {
-  try {
-    const http = require('http');
-
-    const options = {
-      hostname: ESP32_IP,
-      port: ESP32_PORT,
-      path: '/api/servo/center',
-      method: 'GET',
-      timeout: 3000,
-    };
-
-    return new Promise((resolve, reject) => {
-      const req = http.request(options, (res) => {
-        let data = '';
-
-        res.on('data', (chunk) => {
-          data += chunk;
-        });
-
-        res.on('end', () => {
-          try {
-            const response = JSON.parse(data);
-            resolve(response);
-          } catch (e) {
-            resolve({ success: true, message: 'Center command sent', raw: data });
-          }
-        });
-      });
-
-      req.on('error', (error) => {
-        console.error('Error connecting to ESP32 for center:', error);
-        reject(error);
-      });
-
-      req.on('timeout', () => {
-        req.destroy();
-        reject(new Error('Request timeout'));
-      });
-
-      req.end();
-    });
-  } catch (error) {
-    console.error('Error:', error);
-    throw error;
-  }
-}
-
-// Controller untuk GET /api/servo/center (backend -> ESP32)
+// Controller untuk GET /api/servo/center
+// Frontend POST sini untuk request servo center, ESP32 poll sini untuk ambil request
 exports.centerServo = async (req, res) => {
   try {
-    console.log(`📤 Sending center command to ESP32 (${ESP32_IP})`);
-    const espResponse = await sendCenterCommandToESP32();
-
-    res.json({
-      success: true,
-      message: 'Servos centered',
-      espResponse: espResponse,
-    });
+    // Jika GET (ESP32 polling), check apakah ada center request pending
+    if (req.method === 'GET') {
+      if (lastCenterRequest && (Date.now() - lastCenterRequest.timestamp) < 30000) {
+        // Ada center request dalam 30 detik terakhir
+        lastCenterRequest = null;
+        res.json({
+          success: true,
+          message: 'Center request pending',
+          shouldCenter: true,
+        });
+      } else {
+        res.json({
+          success: true,
+          message: 'No center request',
+          shouldCenter: false,
+        });
+      }
+    } else {
+      // POST dari frontend, store untuk ESP32
+      lastCenterRequest = { timestamp: Date.now() };
+      console.log('📤 Center command stored for ESP32');
+      res.json({
+        success: true,
+        message: 'Center command stored, waiting for ESP32',
+      });
+    }
   } catch (error) {
     console.error('Error in centerServo:', error);
-    res.status(503).json({
+    res.status(500).json({
       success: false,
-      message: 'Gagal menghubungi ESP32 untuk center',
+      message: 'Server error',
       error: error.message,
-      hint: `Pastikan ESP32 tersambung ke WiFi dan IP address benar: ${ESP32_IP}`,
     });
   }
 };
 
-// Controller untuk check status ESP32
+// Controller untuk GET /api/servo/status
+// ESP32 poll sini untuk check apakah ada pending command
 exports.checkESP32Status = async (req, res) => {
   try {
-    const http = require('http');
-
-    const options = {
-      hostname: ESP32_IP,
-      port: ESP32_PORT,
-      path: '/status',
-      method: 'GET',
-      timeout: 3000,
-    };
-
-    return new Promise((resolve, reject) => {
-      const req = http.request(options, (res) => {
-        let data = '';
-
-        res.on('data', (chunk) => {
-          data += chunk;
-        });
-
-        res.on('end', () => {
-          try {
-            const response = JSON.parse(data);
-            resolve(response);
-          } catch (e) {
-            resolve({ success: true, message: 'ESP32 is responding', raw: data });
-          }
-        });
-      });
-
-      req.on('error', (error) => {
-        reject(error);
-      });
-
-      req.on('timeout', () => {
-        req.destroy();
-        reject(new Error('Request timeout'));
-      });
-
-      req.end();
-    }).then((espResponse) => {
+    // Jika ada pending command, kirim ke ESP32
+    if (pendingServoCommand) {
+      const command = pendingServoCommand;
+      pendingServoCommand = null; // Clear command setelah dikirim
+      
+      console.log(`✅ Sending pending command to ESP32: ${command.bin}`);
       res.json({
         success: true,
-        message: 'ESP32 Status',
-        espStatus: espResponse,
-        backendInfo: {
-          esp32_ip: ESP32_IP,
-          esp32_port: ESP32_PORT,
-        },
+        message: 'Pending command available',
+        command: command,
+        hasPendingCommand: true,
       });
-    }).catch((error) => {
-      res.status(503).json({
-        success: false,
-        message: 'ESP32 tidak terhubung',
-        error: error.message,
-        hint: `Pastikan ESP32 tersambung ke WiFi dan IP address benar: ${ESP32_IP}`,
+    } else {
+      // Tidak ada command pending
+      res.json({
+        success: true,
+        message: 'ESP32 is connected',
+        hasPendingCommand: false,
       });
-    });
+    }
   } catch (error) {
     console.error('Error:', error);
     res.status(500).json({
@@ -293,24 +124,21 @@ exports.checkESP32Status = async (req, res) => {
     });
   }
 };
-// Controller untuk GET /api/servo/ir-status (query IR dari ESP32)
+// Controller untuk GET /api/servo/ir-status
+// Backend just return counter, tidak perlu query ESP32
 exports.getIRStatus = async (req, res) => {
   try {
-    console.log(`📤 Checking IR status from ESP32 (${ESP32_IP})`);
-    const espResponse = await getIRStatusFromESP32();
-
     res.json({
       success: true,
       message: 'IR Status',
-      irStatus: espResponse,
+      itemCount: itemCountSinceLastReset,
     });
   } catch (error) {
     console.error('Error in getIRStatus:', error);
-    res.status(503).json({
+    res.status(500).json({
       success: false,
-      message: 'Gagal mengambil status IR dari ESP32',
+      message: 'Server error',
       error: error.message,
-      hint: `Pastikan ESP32 tersambung ke WiFi dan IP address benar: ${ESP32_IP}`,
     });
   }
 };
