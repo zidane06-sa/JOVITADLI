@@ -1,7 +1,7 @@
 {
-  "buildCommand": "npm install && npm run build",
+  "installCommand": "npm install && cd backend && npm install && cd ../vite-frontend-framework && npm install && cd ..",
+  "buildCommand": "npm run build",
   "outputDirectory": "vite-frontend-framework/.next",
-  "installCommand": "npm install && cd backend && npm install && cd ..",
   "routes": [
     { "src": "/api/?(.*)", "dest": "/api/index.js" },
     { "src": "/(.*)", "dest": "/vite-frontend-framework/$1" }
