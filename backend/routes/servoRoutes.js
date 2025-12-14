@@ -16,6 +16,8 @@ router.get('/center', centerServo);
 router.get('/ir-status', getIRStatus);
 // POST endpoint untuk item counted (triggered by ESP32)
 router.post('/item-counted', itemCounted);
+// POST endpoint untuk ack after ESP32 executes a command
+router.post('/ack', require('../controllers/servoController').ackCommand);
 // GET endpoint untuk query item count
 router.get('/item-status', getItemStatus);
 // POST endpoint untuk reset item count

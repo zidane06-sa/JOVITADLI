@@ -243,27 +243,57 @@ void pollBackendForCommand() {
       if (payload.indexOf("\"hasPendingCommand\":true") >= 0) {
         Serial.println("Pending command detected!");
 
-        int binPos = payload.indexOf("\"bin\":");
-        if (binPos >= 0) {
-          int start = payload.indexOf('"', binPos + 6); // first quote after "bin":
-          start = payload.indexOf('"', start + 1); // start of value quote
-          if (start >= 0) {
-            int end = payload.indexOf('"', start + 1);
-            if (end > start) {
-              String binVal = payload.substring(start + 1, end);
-              Serial.println("Command bin: " + binVal);
+        // Try to extract command.id and command.bin from JSON payload (simple parsing)
+        int cmdPos = payload.indexOf("\"command\":");
+        String cmdId = "";
+        String binVal = "";
+        if (cmdPos >= 0) {
+          int idPos = payload.indexOf("\"id\":", cmdPos);
+          if (idPos >= 0) {
+            int s1 = payload.indexOf('"', idPos + 5);
+            int s2 = payload.indexOf('"', s1 + 1);
+            if (s1 >= 0 && s2 > s1) {
+              cmdId = payload.substring(s1 + 1, s2);
+            }
+          }
+          int binPos = payload.indexOf("\"bin\":", cmdPos);
+          if (binPos >= 0) {
+            int s1 = payload.indexOf('"', binPos + 6);
+            int s2 = payload.indexOf('"', s1 + 1);
+            if (s1 >= 0 && s2 > s1) {
+              binVal = payload.substring(s1 + 1, s2);
+            }
+          }
+        } else {
+          // fallback: try global search
+          int binPos = payload.indexOf("\"bin\":");
+          if (binPos >= 0) {
+            int s1 = payload.indexOf('"', binPos + 6);
+            int s2 = payload.indexOf('"', s1 + 1);
+            if (s1 >= 0 && s2 > s1) binVal = payload.substring(s1 + 1, s2);
+          }
+        }
 
-              // Map binVal to index
-              int binIndex = -1;
-              if (binVal == "BESI") binIndex = 0;
-              else if (binVal == "KARDUS") binIndex = 1;
-              else if (binVal == "KERTAS") binIndex = 2;
-              else if (binVal == "PLASTIK") binIndex = 3;
+        if (binVal.length() > 0) {
+          Serial.println("Command bin: " + binVal);
 
-              if (binIndex >= 0) {
-                Serial.println("Executing pending servo command: " + binVal);
-                moveServoBin(binIndex);
-              }
+          // Map binVal to index
+          int binIndex = -1;
+          if (binVal == "BESI") binIndex = 0;
+          else if (binVal == "KARDUS") binIndex = 1;
+          else if (binVal == "KERTAS") binIndex = 2;
+          else if (binVal == "PLASTIK") binIndex = 3;
+
+          if (binIndex >= 0) {
+            Serial.println("Executing pending servo command: " + binVal);
+            moveServoBin(binIndex);
+
+            // Post ack to backend if we have cmdId or bin
+            if (cmdId.length() > 0) {
+              postAckToBackend(cmdId, binVal);
+            } else {
+              // If no id, still send bin as best-effort
+              postAckToBackend("", binVal);
             }
           }
         }
@@ -305,5 +335,46 @@ void postItemCountedToBackend() {
     https.end();
   } else {
     Serial.println("Unable to begin HTTPS connection");
+  }
+}
+
+// POST ack to backend after executing pending command
+void postAckToBackend(String cmdId, String binVal) {
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("Cannot post ack: WiFi not connected");
+    return;
+  }
+
+  String url = String(backendBase) + "/api/servo/ack";
+
+  WiFiClientSecure client;
+  client.setInsecure();
+
+  HTTPClient https;
+  Serial.print("Posting ack to backend: ");
+  Serial.println(url);
+
+  if (https.begin(client, url)) {
+    https.addHeader("Content-Type", "application/json");
+    String payload = "{";
+    if (cmdId.length() > 0) {
+      payload += "\"id\":\"" + cmdId + "\",";
+    }
+    payload += "\"bin\":\"" + binVal + "\"}";
+
+    int code = https.POST(payload);
+    if (code > 0) {
+      Serial.print("Ack response code: ");
+      Serial.println(code);
+      String resp = https.getString();
+      Serial.print("Ack payload: ");
+      Serial.println(resp);
+    } else {
+      Serial.print("Ack POST failed, error: ");
+      Serial.println(https.errorToString(code));
+    }
+    https.end();
+  } else {
+    Serial.println("Unable to begin HTTPS connection for ack");
   }
 }

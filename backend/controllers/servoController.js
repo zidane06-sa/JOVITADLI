@@ -6,6 +6,9 @@
 let pendingServoCommand = null;
 let lastCenterRequest = null;
 
+// For logging/audit: last acknowledged commands
+let acknowledgedCommands = [];
+
 // Controller untuk POST /api/servo/move
 // Frontend POST ke sini, dan command disimpan untuk ESP32 poll
 exports.moveServo = async (req, res) => {
@@ -28,18 +31,21 @@ exports.moveServo = async (req, res) => {
       });
     }
 
-    console.log(`📤 Command stored for ESP32: ${bin}`);
-    
-    // Store command untuk ESP32 ambil via polling
-    pendingServoCommand = {
+    // Create a command object with id so ESP32 can ack later
+    const cmd = {
+      id: `${Date.now()}-${Math.floor(Math.random() * 10000)}`,
       bin: bin,
       timestamp: new Date(),
     };
 
+    console.log(`📤 Command stored for ESP32: ${bin} (id=${cmd.id})`);
+    // Store command untuk ESP32 ambil via polling
+    pendingServoCommand = cmd;
+
     res.json({
       success: true,
       message: `Servo command untuk ${bin} sudah tersimpan, menunggu ESP32 poll`,
-      bin: bin,
+      command: cmd,
     });
   } catch (error) {
     console.error('Error in moveServo:', error);
@@ -48,6 +54,30 @@ exports.moveServo = async (req, res) => {
       message: 'Server error',
       error: error.message,
     });
+  }
+};
+
+// Controller untuk POST /api/servo/ack
+// ESP32 calls this after executing the command to acknowledge
+exports.ackCommand = async (req, res) => {
+  try {
+    const { id, bin } = req.body || {};
+    if (!id) {
+      return res.status(400).json({ success: false, message: 'Parameter "id" diperlukan' });
+    }
+
+    console.log(`✅ Ack received from ESP32 for command id=${id}, bin=${bin}`);
+    acknowledgedCommands.push({ id, bin, at: new Date() });
+
+    // If the acked command is still pending, clear it
+    if (pendingServoCommand && pendingServoCommand.id === id) {
+      pendingServoCommand = null;
+    }
+
+    res.json({ success: true, message: 'Ack recorded', id });
+  } catch (error) {
+    console.error('Error in ackCommand:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 };
 
